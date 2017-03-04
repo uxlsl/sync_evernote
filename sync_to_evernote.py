@@ -1,5 +1,6 @@
 # -*- coding:utf-8 -*-
 import os
+import time
 import tempfile
 import shutil
 import subprocess
@@ -7,13 +8,13 @@ import binascii
 import hashlib
 import evernote.edam.userstore.constants as UserStoreConstants
 from evernote.edam.limits import constants as LimitsConstants
+import evernote.edam.notestore.NoteStore as NoteStore
 import evernote.edam.type.ttypes as Types
-from evernote.edam.notestore import NoteStore
 
 from evernote.api.client import EvernoteClient
 
 # https://sandbox.evernote.com/api/DeveloperToken.action
-auth_token = "S=s1:U=936b9:E=161eec32d39:C=15a9711fd58:P=1cd:A=en-devtoken:V=2:H=84efd847b77ab952fc720c4db9264ef9"
+auth_token = "S=s1:U=936b9:E=161f05cd44b:C=15a98aba470:P=1cd:A=en-devtoken:V=2:H=4187b504934afe4b36ea9d5de582a85e"
 
 if auth_token == "your developer token":
     print "Please fill in your developer token"
@@ -30,7 +31,7 @@ version_ok = user_store.checkVersion(
     UserStoreConstants.EDAM_VERSION_MAJOR,
     UserStoreConstants.EDAM_VERSION_MINOR
 )
-print "Is my Evernote API version up to date? ", str(version_ok)
+print "my Evernote API version up to date? ", str(version_ok)
 print ""
 if not version_ok:
     exit(1)
@@ -74,6 +75,7 @@ def update_png_note(note, title, png_path):
     `filename`: 文件名
     """
     image = open(png_path, 'rb').read()
+    note.updated = int(time.time() * 1000)
     md5 = hashlib.md5()
     md5.update(image)
     hash = md5.digest()
@@ -93,13 +95,13 @@ def update_png_note(note, title, png_path):
     note.content += '<en-note>'
     note.content += '<en-media type="image/png" hash="' + hash_hex + '"/>'
     note.content += '</en-note>'
-    return note_store.updateNote(note)
+    return note_store.updateNote(auth_token, note)
 
 
 def convert_to_png(i, o):
     t = tempfile.mktemp() + '.html'
     shutil.copyfile(i, t)
-    subprocess.check_output(["webkit2png", "-o", o, t])
+    subprocess.check_output(["webkit2png", "-x", "1024", "768", "-o", o, t])
     os.remove(t)
 
 
@@ -119,7 +121,8 @@ def sync_evernotes(notebook, path):
         if notename in notes:
             note = notes[notename]
             file_stat = os.stat(os.path.join(path, filename))
-            if file_stat.st_mtime > note.updated:
+            note = note_store.getNote(note.guid, True, True, True, True)
+            if file_stat.st_mtime > note.updated/10**3:
                 print("更新 {}".format(notename))
                 png_path = os.path.join(path, '{}.png'.format(notename))
                 convert_to_png(os.path.join(path, filename), png_path)
