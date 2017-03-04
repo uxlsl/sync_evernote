@@ -14,7 +14,8 @@ import evernote.edam.type.ttypes as Types
 from evernote.api.client import EvernoteClient
 
 # https://sandbox.evernote.com/api/DeveloperToken.action
-auth_token = "S=s1:U=936b9:E=161f05cd44b:C=15a98aba470:P=1cd:A=en-devtoken:V=2:H=4187b504934afe4b36ea9d5de582a85e"
+# https://app.yinxiang.com/api/DeveloperToken.action
+auth_token = "S=s47:U=b14759:E=161f1415051:C=15a999020a0:P=1cd:A=en-devtoken:V=2:H=15940e004756f38dd31386884f2f7b97"
 
 if auth_token == "your developer token":
     print "Please fill in your developer token"
@@ -22,7 +23,7 @@ if auth_token == "your developer token":
         "https://sandbox.evernote.com/api/DeveloperToken.action"
     exit(1)
 
-client = EvernoteClient(token=auth_token, sandbox=True)
+client = EvernoteClient(service_host='app.yinxiang.com', token=auth_token, sandbox=False)
 
 user_store = client.get_user_store()
 
@@ -147,7 +148,7 @@ def cmd_to_evernotes(path):
 
 
 def main():
-    cmd_to_evernotes('./cmdnotes/')
+    cmd_to_evernotes('./notes/')
 
 
 if __name__ == '__main__':
