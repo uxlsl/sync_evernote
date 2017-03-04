@@ -1,24 +1,17 @@
 # -*- coding:utf-8 -*-
-#
-# A simple Evernote API demo script that lists all notebooks in the user's
-# account and creates a simple test note in the default notebook.
-#
-# Before running this sample, you must fill in your Evernote developer token.
-#
-# To run (Unix):
-#   export PYTHONPATH=../../lib; python EDAMTest.py
-#
-
-import hashlib
+import os
+import tempfile
+import shutil
+import subprocess
 import binascii
+import hashlib
 import evernote.edam.userstore.constants as UserStoreConstants
+from evernote.edam.limits import constants as LimitsConstants
 import evernote.edam.type.ttypes as Types
+from evernote.edam.notestore import NoteStore
 
 from evernote.api.client import EvernoteClient
 
-# Real applications authenticate with Evernote using OAuth, but for the
-# purpose of exploring the API, you can get a developer token that allows
-# you to access your own Evernote account. To get a developer token, visit
 # https://sandbox.evernote.com/api/DeveloperToken.action
 auth_token = "S=s1:U=936b9:E=161eec32d39:C=15a9711fd58:P=1cd:A=en-devtoken:V=2:H=84efd847b77ab952fc720c4db9264ef9"
 
@@ -28,10 +21,6 @@ if auth_token == "your developer token":
         "https://sandbox.evernote.com/api/DeveloperToken.action"
     exit(1)
 
-# Initial development is performed on our sandbox server. To use the production
-# service, change sandbox=False and replace your
-# developer token above with a token from
-# https://www.evernote.com/api/DeveloperToken.action
 client = EvernoteClient(token=auth_token, sandbox=True)
 
 user_store = client.get_user_store()
@@ -48,60 +37,115 @@ if not version_ok:
 
 note_store = client.get_note_store()
 
-# List all of the notebooks in the user's account
-notebooks = note_store.listNotebooks()
-print "Found ", len(notebooks), " notebooks:"
-for notebook in notebooks:
-    print "  * ", notebook.name
 
-print
-print "Creating a new note in the default notebook"
-print
+def create_png_note(title, png_path,notebook):
+    """
+    `title`: 标题
+    `filename`: 文件名
+    """
+    note = Types.Note()
+    note.notebookGuid = notebook.guid
+    image = open(png_path, 'rb').read()
+    md5 = hashlib.md5()
+    md5.update(image)
+    hash = md5.digest()
+    data = Types.Data()
+    data.size = len(image)
+    data.bodyHash = hash
+    data.body = image
+    resource = Types.Resource()
+    resource.mime = 'image/png'
+    resource.data = data
+    note.resources = [resource]
+    hash_hex = binascii.hexlify(hash)
+    note.title = title
+    note.content = '<?xml version="1.0" encoding="UTF-8"?>'
+    note.content += '<!DOCTYPE en-note SYSTEM ' \
+        '"http://xml.evernote.com/pub/enml2.dtd">'
+    note.content += '<en-note>'
+    note.content += '<en-media type="image/png" hash="' + hash_hex + '"/>'
+    note.content += '</en-note>'
+    return note_store.createNote(note)
 
-# To create a new note, simply create a new Note object and fill in
-# attributes such as the note's title.
-note = Types.Note()
 
-# To include an attachment such as an image in a note, first create a Resource
-# for the attachment. At a minimum, the Resource contains the binary attachment
-# data, an MD5 hash of the binary data, and the attachment MIME type.
-# It can also include attributes such as filename and location.
-image = open('enlogo.png', 'rb').read()
-md5 = hashlib.md5()
-md5.update(image)
-hash = md5.digest()
+def update_png_note(note, title, png_path):
+    """
+    `title`: 标题
+    `filename`: 文件名
+    """
+    image = open(png_path, 'rb').read()
+    md5 = hashlib.md5()
+    md5.update(image)
+    hash = md5.digest()
+    data = Types.Data()
+    data.size = len(image)
+    data.bodyHash = hash
+    data.body = image
+    resource = Types.Resource()
+    resource.mime = 'image/png'
+    resource.data = data
+    note.resources = [resource]
+    hash_hex = binascii.hexlify(hash)
+    note.title = title
+    note.content = '<?xml version="1.0" encoding="UTF-8"?>'
+    note.content += '<!DOCTYPE en-note SYSTEM ' \
+        '"http://xml.evernote.com/pub/enml2.dtd">'
+    note.content += '<en-note>'
+    note.content += '<en-media type="image/png" hash="' + hash_hex + '"/>'
+    note.content += '</en-note>'
+    return note_store.updateNote(note)
 
-data = Types.Data()
-data.size = len(image)
-data.bodyHash = hash
-data.body = image
 
-resource = Types.Resource()
-resource.mime = 'image/png'
-resource.data = data
+def convert_to_png(i, o):
+    t = tempfile.mktemp() + '.html'
+    shutil.copyfile(i, t)
+    subprocess.check_output(["webkit2png", "-o", o, t])
+    os.remove(t)
 
-# Now, add the new Resource to the note's list of resources
-note.resources = [resource]
 
-# To display the Resource as part of the note's content, include an <en-media>
-# tag in the note's ENML content. The en-media tag identifies the corresponding
-# Resource using the MD5 hash.
-hash_hex = binascii.hexlify(hash)
+def sync_evernotes(notebook, path):
+    """同步当前目录的笔记到evernote notebook上"""
+    _filter = NoteStore.NoteFilter()
+    _filter.notebooksGuid = notebook.guid
+    spec = NoteStore.NotesMetadataResultSpec()
+    spec.includeTitle = True
+    notelist = note_store.findNotesMetadata(_filter, 0,LimitsConstants.EDAM_USER_NOTES_MAX, spec)
+    notes = {i.title:i for i in notelist.notes}
 
-# The content of an Evernote note is represented using Evernote Markup Language
-# (ENML). The full ENML specification can be found in the Evernote API Overview
-# at http://dev.evernote.com/documentation/cloud/chapters/ENML.php
-note.title = "欢迎使用 Cmd Markdown 编辑阅读器"
-note.content = '<?xml version="1.0" encoding="UTF-8"?>'
-note.content += '<!DOCTYPE en-note SYSTEM ' \
-    '"http://xml.evernote.com/pub/enml2.dtd">'
-note.content += '<en-note>'
-note.content += '<en-media type="image/png" hash="' + hash_hex + '"/>'
-note.content += '</en-note>'
+    for filename in os.listdir(path):
+        notename, fmt = filename.split('.')
+        if fmt != 'html':
+            continue
+        if notename in notes:
+            note = notes[notename]
+            file_stat = os.stat(os.path.join(path, filename))
+            if file_stat.st_mtime > note.updated:
+                print("更新 {}".format(notename))
+                png_path = os.path.join(path, '{}.png'.format(notename))
+                convert_to_png(os.path.join(path, filename), png_path)
+                update_png_note(note, notename, png_path)
+        else:
+            print("创建 {}".format(notename))
+            png_path = os.path.join(path, '{}.png'.format(notename))
+            convert_to_png(os.path.join(path, filename), png_path)
+            create_png_note(notename, png_path, notebook)
 
-# Finally, send the new note to Evernote using the createNote method
-# The new Note object that is returned will contain server-generated
-# attributes such as the new note's unique GUID.
-created_note = note_store.createNote(note)
 
-print "Successfully created a new note with GUID: ", created_note.guid
+def cmd_to_evernotes(path):
+    """将cmdmarkdown的文件更新到evernote中去"""
+    evernotebooks = {i.name:i for i in note_store.listNotebooks()}
+    for notebook_name in os.listdir(path):
+        if notebook_name in evernotebooks:
+            notebook = evernotebooks[notebook_name]
+        else:
+            notebook = Types.Notebook(name=notebook_name)
+            note_store.createNotebook(notebook)
+        sync_evernotes(notebook, os.path.join(path, notebook_name))
+
+
+def main():
+    cmd_to_evernotes('./cmdnotes/')
+
+
+if __name__ == '__main__':
+    main()
