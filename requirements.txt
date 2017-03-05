@@ -1,4 +1,5 @@
 evernote
 webkit2png
 # apt-get install python-qt4 libqt4-webkit xvfb
+markdown2
 
