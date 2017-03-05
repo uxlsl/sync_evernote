@@ -16,7 +16,7 @@ from evernote.api.client import EvernoteClient
 
 # https://sandbox.evernote.com/api/DeveloperToken.action
 # https://app.yinxiang.com/api/DeveloperToken.action
-auth_token = "S=s47:U=b14759:E=161f1415051:C=15a999020a0:P=1cd:A=en-devtoken:V=2:H=15940e004756f38dd31386884f2f7b97"
+auth_token = "your developer token"
 
 if auth_token == "your developer token":
     print "Please fill in your developer token"
